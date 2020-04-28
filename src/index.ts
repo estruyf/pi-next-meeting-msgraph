@@ -5,7 +5,8 @@ import { Auth } from './helpers';
 import { MsGraphService } from './services';
 import { formatRelative, format, addDays, subHours, parseJSON } from 'date-fns';
 import ruuvi from 'node-ruuvitag';
-import { RuuviTag, RuuviInfo, CalendarEvents } from './models';
+import { RuuviTag, RuuviInfo, CalendarEvents, Availability, StatusInfo } from './models';
+import fetch from 'node-fetch';
 
 const app = express();
 
@@ -13,16 +14,18 @@ const MSGRAPH_URL = `https://graph.microsoft.com`;
 const PORT = process.env.PORT || 1337;
 const APP_ID = process.env.APPID || "";
 const DEBUG = process.env.DEBUG ? process.env.DEBUG == "true" : false;
+const STATUS_API = process.env.STATUSAPI || ""
 
 const auth = new Auth(APP_ID);
 let temperature = null;
+let availability = null;
 let nextMeeting = { title: "", time: "" };
 let timeoutIdx: NodeJS.Timeout = null;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/get', (req, res) => res.send({ meeting: nextMeeting, temperature }));
+app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
     clearTimeout(timeoutIdx);
@@ -71,6 +74,20 @@ const presencePolling = async () => {
     }
   }
 
+  if (STATUS_API) {
+    const data = await fetch(STATUS_API);
+    if (data && data.ok) {
+      const status: StatusInfo = await data.json();
+      if (status.red === 0 && status.green === 144 && status.blue === 0) {
+        availability = Availability.Available;
+      } else if (status.red === 255 && status.green === 191 && status.blue === 0) {
+        availability = Availability.Away;
+      } else if (status.red === 179 && status.green === 0 && status.blue === 0) {
+        availability = Availability.Busy;
+      }
+    }
+  }
+
   timeoutIdx = setTimeout(() => {
     presencePolling();
   }, 1 * 60 * 1000);
@@ -80,10 +97,14 @@ const presencePolling = async () => {
  * Ruuvi
  */
 ruuvi.on('found', (tag: RuuviTag) => {
+  if (DEBUG) {
+    console.log(`Ruuvi tag:`, tag);
+  }
+  
   tag.on('updated', (data: RuuviInfo) => {
     if (data && data.temperature) {
       if (DEBUG) {
-        console.log(`Ruuvi:`, data);
+        console.log(`Ruuvi tag data:`, data);
       }
       temperature = data.temperature;
     }      
