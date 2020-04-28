@@ -1,10 +1,10 @@
-interface CalendarEvents {
+export interface CalendarEvents {
   '@odata.context': string;
   '@odata.nextLink': string;
   value: Event[];
 }
 
-interface Event {
+export interface Event {
   '@odata.etag': string;
   id: string;
   subject: string;
@@ -12,7 +12,7 @@ interface Event {
   location: Location;
 }
 
-interface Location {
+export interface Location {
   displayName: string;
   locationType: string;
   uniqueIdType: string;
@@ -20,10 +20,10 @@ interface Location {
   coordinates: Address;
 }
 
-interface Address {
+export interface Address {
 }
 
-interface Start {
+export interface Start {
   dateTime: string;
   timeZone: string;
 }

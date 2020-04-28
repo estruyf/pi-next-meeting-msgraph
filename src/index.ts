@@ -3,7 +3,9 @@
 import express from 'express';
 import { Auth } from './helpers';
 import { MsGraphService } from './services';
-import { formatRelative, format, addDays, parseJSON } from 'date-fns';
+import { formatRelative, format, addDays, subHours, parseJSON } from 'date-fns';
+import ruuvi from 'node-ruuvitag';
+import { RuuviTag, RuuviInfo, CalendarEvents } from './models';
 
 const app = express();
 
@@ -13,13 +15,14 @@ const APP_ID = process.env.APPID || "";
 const DEBUG = process.env.DEBUG ? process.env.DEBUG == "true" : false;
 
 const auth = new Auth(APP_ID);
+let temperature = null;
 let nextMeeting = { title: "", time: "" };
 let timeoutIdx: NodeJS.Timeout = null;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/get', (req, res) => res.send(nextMeeting));
+app.get('/get', (req, res) => res.send({ meeting: nextMeeting, temperature }));
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
     clearTimeout(timeoutIdx);
@@ -52,7 +55,7 @@ const startAuthentication = () => {
 const presencePolling = async () => {
   const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, DEBUG);
   if (accessToken) {
-    const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(new Date(), "yyyy-MM-dd'T'HH:mm:ss")}&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
+    const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
     const calendarItems: CalendarEvents = await MsGraphService.get(`${MSGRAPH_URL}/${msGraphEndPoint}`, accessToken, DEBUG);
     if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
       const event = calendarItems.value[0];
@@ -72,3 +75,17 @@ const presencePolling = async () => {
     presencePolling();
   }, 1 * 60 * 1000);
 }
+
+/**
+ * Ruuvi
+ */
+ruuvi.on('found', (tag: RuuviTag) => {
+  tag.on('updated', (data: RuuviInfo) => {
+    if (data && data.temperature) {
+      if (DEBUG) {
+        console.log(`Ruuvi:`, data);
+      }
+      temperature = data.temperature;
+    }      
+  });
+});
