@@ -4,9 +4,25 @@ import express from 'express';
 import { Auth, AuthLogging } from './helpers';
 import { MsGraphService } from './services';
 import { formatRelative, format, addDays, subHours, parseJSON } from 'date-fns';
+import enGB from 'date-fns/locale/en-GB';
 import ruuvi from 'node-ruuvitag';
 import { RuuviTag, RuuviInfo, CalendarEvents, Availability, StatusInfo } from './models';
 import fetch from 'node-fetch';
+
+// Date formatting
+const formatRelativeLocale = {
+  lastWeek: "'Last' eeee 'at' HH:mm",
+  yesterday: "'Yesterday at' HH:mm",
+  today: "'Today at' HH:mm",
+  tomorrow: "'Tomorrow at' HH:mm",
+  nextWeek: "eeee 'at' HH:mm",
+  other: 'HH:mm'
+};
+
+const locale = {
+  ...enGB,
+  formatRelative: (token: string) => formatRelativeLocale[token]
+};
 
 const app = express();
 
@@ -68,7 +84,7 @@ const presencePolling = async () => {
       const event = calendarItems.value[0];
       nextMeeting = {
         title: event.subject,
-        time: formatRelative(parseJSON(event.start.dateTime), new Date())
+        time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
       };
     } else {
       nextMeeting = {
