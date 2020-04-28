@@ -149,6 +149,7 @@ export class Auth {
                 return;
               }
 
+              authMsg.text = "Already authenticated";
               this.userCodeInfo = undefined;
               resolve(<TokenResponse>response);
             });
