@@ -1,7 +1,7 @@
 //@ts-check
 
 import express from 'express';
-import { Auth } from './helpers';
+import { Auth, AuthLogging } from './helpers';
 import { MsGraphService } from './services';
 import { formatRelative, format, addDays, subHours, parseJSON } from 'date-fns';
 import ruuvi from 'node-ruuvitag';
@@ -21,11 +21,15 @@ let temperature = null;
 let availability = null;
 let nextMeeting = { title: "", time: "" };
 let timeoutIdx: NodeJS.Timeout = null;
+let authMsg: AuthLogging = {
+  text: ""
+};
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
+app.get('/auth', (req, res) => res.send(authMsg));
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
     clearTimeout(timeoutIdx);
@@ -44,7 +48,7 @@ app.listen(PORT, () => {
  * Starts the autentication flow
  */
 const startAuthentication = () => {
-  auth.ensureAccessToken(MSGRAPH_URL, DEBUG).then(async (accessToken) => {
+  auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG).then(async (accessToken) => {
     if (accessToken) {
       console.log(`Access token acquired.`);
       presencePolling();
@@ -56,7 +60,7 @@ const startAuthentication = () => {
  * Keep calling the MS Graph to keep the token alive
  */
 const presencePolling = async () => {
-  const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, DEBUG);
+  const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
   if (accessToken) {
     const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
     const calendarItems: CalendarEvents = await MsGraphService.get(`${MSGRAPH_URL}/${msGraphEndPoint}`, accessToken, DEBUG);

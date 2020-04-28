@@ -34,3 +34,10 @@ Startup:
 ```
 pm2 startup
 ```
+
+Get the log output (to login):
+
+```
+pm2 logs
+```
+

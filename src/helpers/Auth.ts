@@ -3,6 +3,10 @@ import { AccessToken } from '../models';
 
 const MS_LOGIN_URL = "https://login.microsoftonline.com";
 
+export interface AuthLogging {
+  text: string;
+}
+
 export interface Hash<TValue> {
   [key: string]: TValue;
 }
@@ -43,7 +47,7 @@ export class Auth {
    * @param debug 
    * @param fetchNew 
    */
-  public async ensureAccessToken(resource: string, debug: boolean = false, fetchNew: boolean = false): Promise<string | null> {
+  public async ensureAccessToken(resource: string, authMsg: AuthLogging, debug: boolean = false, fetchNew: boolean = false): Promise<string | null> {
     try {
       const now: Date = new Date();
       const accessToken: AccessToken | undefined = this.service.accessTokens[resource];
@@ -70,7 +74,7 @@ export class Auth {
         getTokenPromise = this.ensureAccessTokenWithRefreshToken;
       }
 
-      const tokenResponse = await getTokenPromise(resource, debug);
+      const tokenResponse = await getTokenPromise(resource, debug, authMsg);
       if (!tokenResponse) {
         return null;
       }
@@ -105,7 +109,7 @@ export class Auth {
    * @param log
    * @param debug
    */
-  private ensureAccessTokenWithDeviceCode = (resource: string, debug: boolean): Promise<TokenResponse> => {
+  private ensureAccessTokenWithDeviceCode = (resource: string, debug: boolean, authMsg: AuthLogging): Promise<TokenResponse> => {
     if (debug) {
       console.log(`Starting Auth.ensureAccessTokenWithDeviceCode. resource: ${resource}, debug: ${debug}`);
     }
@@ -128,6 +132,7 @@ export class Auth {
             return;
           }
 
+          authMsg.text = response.message;
           console.log(response.message);
 
           this.userCodeInfo = response;
