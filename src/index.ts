@@ -46,6 +46,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
 app.get('/auth', (req, res) => res.send(authMsg));
+
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
     clearTimeout(timeoutIdx);
