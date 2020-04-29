@@ -78,7 +78,12 @@ const startAuthentication = () => {
 const presencePolling = async () => {
   const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
   if (accessToken) {
-    const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
+    const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
+
+    if (DEBUG) {
+      console.log(`Calling: ${msGraphEndPoint}`);
+    }
+
     const calendarItems: CalendarEvents = await MsGraphService.get(`${MSGRAPH_URL}/${msGraphEndPoint}`, accessToken, DEBUG);
     if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
       const event = calendarItems.value[0];
@@ -98,12 +103,18 @@ const presencePolling = async () => {
     const data = await fetch(STATUS_API);
     if (data && data.ok) {
       const status: StatusInfo = await data.json();
+      if (DEBUG) {
+        console.log(`Status:`, JSON.stringify(status));
+      }
+
       if (status.red === 0 && status.green === 144 && status.blue === 0) {
         availability = Availability.Available;
       } else if (status.red === 255 && status.green === 191 && status.blue === 0) {
         availability = Availability.Away;
       } else if (status.red === 179 && status.green === 0 && status.blue === 0) {
         availability = Availability.Busy;
+      } else {
+        availability = Availability.Away;
       }
     }
   }
