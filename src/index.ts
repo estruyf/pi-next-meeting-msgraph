@@ -46,6 +46,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
 app.get('/auth', (req, res) => res.send(authMsg));
+app.get('/status', async (req, res) => res.send(await getStatus()));
 
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
@@ -100,6 +101,14 @@ const presencePolling = async () => {
     }
   }
 
+  await getStatus();
+
+  timeoutIdx = setTimeout(() => {
+    presencePolling();
+  }, 1 * 60 * 1000);
+}
+
+const getStatus = async () => {
   if (STATUS_API) {
     const data = await fetch(STATUS_API);
     if (data && data.ok) {
@@ -117,12 +126,11 @@ const presencePolling = async () => {
       } else {
         availability = Availability.Away;
       }
+
+      return status;
     }
   }
-
-  timeoutIdx = setTimeout(() => {
-    presencePolling();
-  }, 1 * 60 * 1000);
+  return null;
 }
 
 /**
