@@ -97,7 +97,7 @@ const presencePolling = async () => {
 /**
  * Retrieve the meeting details
  */
-const getMeeting = async (nextLink: string = null) => {
+const getMeeting = async (nextLink: string = null, count: number = 0) => {
   const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
   if (accessToken) {
     let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
@@ -115,14 +115,16 @@ const getMeeting = async (nextLink: string = null) => {
       const event = calendarItems.value[0];
       const eventDate = parseJSON(event.start.dateTime);
       const difference = differenceInMinutes(eventDate, new Date());
-      if (difference > 0) {
+      console.log(`DIFFERENCE`, difference, count);
+      if (difference > 0 || count === 1) {
         nextMeeting = {
           title: event.subject,
           time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
         };
         return calendarItems;
+      } else {
+        return getMeeting(calendarItems['@odata.nextLink'], ++count);
       }
-      return getMeeting(calendarItems['@odata.nextLink'])
     } else {
       nextMeeting = {
         title: "",
