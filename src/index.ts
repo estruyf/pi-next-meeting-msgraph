@@ -46,7 +46,10 @@ app.use(express.urlencoded({ extended: false }));
 
 app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
 app.get('/auth', (req, res) => res.send(authMsg));
-app.get('/status', async (req, res) => res.send(await getStatus()));
+app.get('/status', async (req, res) => {
+  const status = await getStatus();
+  res.send({ status, availability });
+});
 
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
