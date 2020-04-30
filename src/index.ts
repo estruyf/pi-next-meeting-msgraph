@@ -3,7 +3,7 @@
 import express from 'express';
 import { Auth, AuthLogging } from './helpers';
 import { MsGraphService } from './services';
-import { formatRelative, format, addDays, subHours, parseJSON } from 'date-fns';
+import { formatRelative, format, addDays, subHours, parseJSON, differenceInMinutes } from 'date-fns';
 import enGB from 'date-fns/locale/en-GB';
 import ruuvi from 'node-ruuvitag';
 import { RuuviTag, RuuviInfo, CalendarEvents, Availability, StatusInfo } from './models';
@@ -50,6 +50,10 @@ app.get('/status', async (req, res) => {
   const status = await getStatus();
   res.send({ status, availability });
 });
+app.get('/meeting', async (req, res) => {
+  const meeting = await getMeeting();
+  res.send({ meeting });
+});
 
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
@@ -81,28 +85,7 @@ const startAuthentication = () => {
  * Keep calling the MS Graph to keep the token alive
  */
 const presencePolling = async () => {
-  const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
-  if (accessToken) {
-    const msGraphEndPoint = `v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
-
-    if (DEBUG) {
-      console.log(`Calling: ${msGraphEndPoint}`);
-    }
-
-    const calendarItems: CalendarEvents = await MsGraphService.get(`${MSGRAPH_URL}/${msGraphEndPoint}`, accessToken, DEBUG);
-    if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
-      const event = calendarItems.value[0];
-      nextMeeting = {
-        title: event.subject,
-        time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
-      };
-    } else {
-      nextMeeting = {
-        title: "",
-        time: ""
-      };
-    }
-  }
+  await getMeeting();
 
   await getStatus();
 
@@ -111,6 +94,48 @@ const presencePolling = async () => {
   }, 1 * 60 * 1000);
 }
 
+/**
+ * Retrieve the meeting details
+ */
+const getMeeting = async (nextLink: string = null) => {
+  const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
+  if (accessToken) {
+    let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
+
+    if (nextLink) {
+      msGraphEndPoint = nextLink;
+    }
+
+    if (DEBUG) {
+      console.log(`Calling: ${msGraphEndPoint}`);
+    }
+
+    const calendarItems: CalendarEvents = await MsGraphService.get(`${msGraphEndPoint}`, accessToken, DEBUG);
+    if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
+      const event = calendarItems.value[0];
+      const eventDate = parseJSON(event.start.dateTime);
+      const difference = differenceInMinutes(eventDate, new Date());
+      if (difference > 0) {
+        nextMeeting = {
+          title: event.subject,
+          time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
+        };
+        return calendarItems;
+      }
+      return getMeeting(calendarItems['@odata.nextLink'])
+    } else {
+      nextMeeting = {
+        title: "",
+        time: ""
+      };
+    }
+  }
+  return null;
+};
+
+/**
+ * Get the status details
+ */
 const getStatus = async () => {
   if (STATUS_API) {
     const data = await fetch(STATUS_API);
@@ -134,7 +159,7 @@ const getStatus = async () => {
     }
   }
   return null;
-}
+};
 
 /**
  * Ruuvi
