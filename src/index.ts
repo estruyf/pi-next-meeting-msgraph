@@ -98,69 +98,80 @@ const presencePolling = async () => {
  * Retrieve the meeting details
  */
 const getMeeting = async (nextLink: string = null, count: number = 0) => {
-  const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
-  if (accessToken) {
-    let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
+  try {
+    const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
+    if (accessToken) {
+      let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
 
-    if (nextLink) {
-      msGraphEndPoint = nextLink;
-    }
-
-    if (DEBUG) {
-      console.log(`Calling: ${msGraphEndPoint}`);
-    }
-
-    const calendarItems: CalendarEvents = await MsGraphService.get(`${msGraphEndPoint}`, accessToken, DEBUG);
-    if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
-      const event = calendarItems.value[0];
-      const eventDate = parseJSON(event.start.dateTime);
-      const difference = differenceInMinutes(eventDate, new Date());
-      console.log(`DIFFERENCE`, difference, count);
-      if (difference > 0 || count === 1) {
-        nextMeeting = {
-          title: event.subject,
-          time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
-        };
-        return calendarItems;
-      } else {
-        return getMeeting(calendarItems['@odata.nextLink'], ++count);
+      if (nextLink) {
+        msGraphEndPoint = nextLink;
       }
-    } else {
-      nextMeeting = {
-        title: "",
-        time: ""
-      };
+
+      if (DEBUG) {
+        console.log(`Calling: ${msGraphEndPoint}`);
+      }
+
+      const calendarItems: CalendarEvents = await MsGraphService.get(`${msGraphEndPoint}`, accessToken, DEBUG);
+      if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
+        const event = calendarItems.value[0];
+        const eventDate = parseJSON(event.start.dateTime);
+        const difference = differenceInMinutes(eventDate, new Date());
+        console.log(`DIFFERENCE`, difference, count);
+        if (difference > 0 || count === 1) {
+          nextMeeting = {
+            title: event.subject,
+            time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
+          };
+          return calendarItems;
+        } else {
+          return getMeeting(calendarItems['@odata.nextLink'], ++count);
+        }
+      } else {
+        nextMeeting = {
+          title: "",
+          time: ""
+        };
+      }
     }
+    return null;
+  } catch (e) {
+    console.error(e.message);
+    return null;
   }
-  return null;
 };
 
 /**
  * Get the status details
  */
 const getStatus = async () => {
-  if (STATUS_API) {
-    const data = await fetch(STATUS_API);
-    if (data && data.ok) {
-      const status: StatusInfo = await data.json();
-      if (DEBUG) {
-        console.log(`Status:`, JSON.stringify(status));
-      }
+  try {
+    if (STATUS_API) {
+      const data = await fetch(STATUS_API);
+      if (data && data.ok) {
+        const status: StatusInfo = await data.json();
+        if (DEBUG) {
+          console.log(`Status:`, JSON.stringify(status));
+        }
 
-      if (status.red === 0 && status.green === 144 && status.blue === 0) {
-        availability = Availability.Available;
-      } else if (status.red === 255 && status.green === 191 && status.blue === 0) {
-        availability = Availability.Away;
-      } else if (status.red === 179 && status.green === 0 && status.blue === 0) {
-        availability = Availability.Busy;
-      } else {
-        availability = Availability.Away;
-      }
+        if (status.red === 0 && status.green === 144 && status.blue === 0) {
+          availability = Availability.Available;
+        } else if (status.red === 255 && status.green === 191 && status.blue === 0) {
+          availability = Availability.Away;
+        } else if (status.red === 179 && status.green === 0 && status.blue === 0) {
+          availability = Availability.Busy;
+        } else {
+          availability = Availability.Away;
+        }
 
-      return status;
+        return status;
+      }
     }
+    return null;
+  } catch (e) {
+    console.error(e.message);
+    availability = Availability.Away;
+    return null;
   }
-  return null;
 };
 
 /**
