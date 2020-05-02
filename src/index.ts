@@ -97,15 +97,11 @@ const presencePolling = async () => {
 /**
  * Retrieve the meeting details
  */
-const getMeeting = async (nextLink: string = null, count: number = 0) => {
+const getMeeting = async () => {
   try {
     const accessToken = await auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
     if (accessToken) {
-      let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=1&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
-
-      if (nextLink) {
-        msGraphEndPoint = nextLink;
-      }
+      let msGraphEndPoint = `${MSGRAPH_URL}/v1.0/me/calendarview?startdatetime=${format(subHours(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&enddatetime=${format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss")}%2B01:00&$select=subject,location,start&$top=5&$orderby=start/dateTime asc&$filter=isAllDay eq false`;
 
       if (DEBUG) {
         console.log(`Calling: ${msGraphEndPoint}`);
@@ -113,29 +109,35 @@ const getMeeting = async (nextLink: string = null, count: number = 0) => {
 
       const calendarItems: CalendarEvents = await MsGraphService.get(`${msGraphEndPoint}`, accessToken, DEBUG);
       if (calendarItems && calendarItems.value && calendarItems.value.length > 0) {
-        const event = calendarItems.value[0];
-        const eventDate = parseJSON(event.start.dateTime);
-        const difference = differenceInMinutes(eventDate, new Date());
-        console.log(`DIFFERENCE`, difference, count);
-        if (difference > 0 || count === 1) {
-          nextMeeting = {
-            title: event.subject,
-            time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
-          };
-          return calendarItems;
-        } else {
-          return getMeeting(calendarItems['@odata.nextLink'], ++count);
-        }
-      } else {
-        nextMeeting = {
-          title: "",
-          time: ""
-        };
+        for (const event of calendarItems.value) {
+          const eventDate = parseJSON(event.start.dateTime);
+          const difference = differenceInMinutes(eventDate, new Date());
+          
+          if (DEBUG) {
+            console.log(`Meeting "${event.subject}" time difference: ${difference}`);
+          }
+
+          if (difference > 0) {
+            nextMeeting = {
+              title: event.subject,
+              time: formatRelative(parseJSON(event.start.dateTime), new Date(), { locale })
+            };
+            return calendarItems;
+          }
+        }        
       }
     }
+    nextMeeting = {
+      title: "",
+      time: ""
+    };
     return null;
   } catch (e) {
     console.error(e.message);
+    nextMeeting = {
+      title: "",
+      time: ""
+    };
     return null;
   }
 };
