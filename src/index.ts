@@ -29,12 +29,15 @@ const app = express();
 const MSGRAPH_URL = `https://graph.microsoft.com`;
 const PORT = process.env.PORT || 1337;
 const APP_ID = process.env.APPID || "";
+const TODO_APP_ID = process.env.TODOAPPID || "";
 const DEBUG = process.env.DEBUG ? process.env.DEBUG == "true" : false;
 const STATUS_API = process.env.STATUSAPI || ""
 
-const auth = new Auth(APP_ID);
+const auth = new Auth(APP_ID, "Meeting");
+const todoAuth = new Auth(TODO_APP_ID, "Todo");
 let temperature = null;
 let availability = null;
+let todoTasks = null;
 let nextMeeting = { title: "", time: "" };
 let timeoutIdx: NodeJS.Timeout = null;
 let authMsg: AuthLogging = {
@@ -54,6 +57,10 @@ app.get('/meeting', async (req, res) => {
   const meeting = await getMeeting();
   res.send({ meeting });
 });
+app.get('/todo', async (req, res) => {
+  const tasks = await getTodo();
+  res.send({ tasks });
+});
 
 app.get('/restart', (req, res) => {
   if (timeoutIdx) {
@@ -61,12 +68,14 @@ app.get('/restart', (req, res) => {
     timeoutIdx = null;
   }
   startAuthentication();
+  startTodoAuthentication();
   res.send("Authentication restarted");
 });
 
 app.listen(PORT, () => {
   console.log('Listening on port %s for inbound button push event notifications', PORT);
   startAuthentication();
+  startTodoAuthentication();
 });
 
 /**
@@ -75,8 +84,20 @@ app.listen(PORT, () => {
 const startAuthentication = () => {
   auth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG).then(async (accessToken) => {
     if (accessToken) {
-      console.log(`Access token acquired.`);
+      console.log(`Calendar access token acquired.`);
       presencePolling();
+    }
+  });
+}
+
+/**
+ * Starts todo autentication flow
+ */
+const startTodoAuthentication = () => {
+  todoAuth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG).then(async (accessToken) => {
+    if (accessToken) {
+      console.log(`Todo access token acquired.`);
+      todoPolling();
     }
   });
 }
@@ -93,6 +114,47 @@ const presencePolling = async () => {
     presencePolling();
   }, 1 * 60 * 1000);
 }
+
+/**
+ * Todo polling
+ */
+const todoPolling = async () => {
+  await getTodo();
+
+  timeoutIdx = setTimeout(() => {
+    todoPolling();
+  }, 1 * 60 * 1000);
+}
+
+/**
+ * Retrieve the todo details
+ */
+const getTodo = async () => {
+  try {
+    const accessToken = await todoAuth.ensureAccessToken(MSGRAPH_URL, authMsg, DEBUG);
+    let msGraphEndPoint = `${MSGRAPH_URL}/beta/me/outlook/tasks?$count=true&$select=subject&$filter=dueDateTime/datetime eq '${format(new Date(), "yyyy-MM-dd")}T00:00:00${encodeURIComponent(format(new Date(), "xxx"))}'`;
+
+    if (DEBUG) {
+      console.log(`Calling: ${msGraphEndPoint}`);
+    }
+
+    const todoItems: Tasks = await MsGraphService.get(`${msGraphEndPoint}`, accessToken, DEBUG);
+    if (todoItems && todoItems.value && todoItems.value.length > 0) {
+      console.log(`Todo`, todoItems);
+
+      todoTasks = todoItems["@odata.count"];
+
+      return todoItems;
+    }
+
+    todoTasks = null;
+    return null;
+  } catch (e) {
+    console.error(e.message);
+    todoTasks = null;
+    return null;
+  }
+};
 
 /**
  * Retrieve the meeting details

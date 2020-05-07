@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && STATUSAPI='http://192.168.1.90:5000/api/status' DEBUG=true APPID=1844754b-7b5d-486a-8284-f254b6108e2d node ./dist/index.js"
+    "start": "tsc && STATUSAPI='http://192.168.1.90:5000/api/status' DEBUG=true TODOAPPID=4c10048e-d84f-4f82-85c9-4b1169819a54 APPID=1844754b-7b5d-486a-8284-f254b6108e2d node ./dist/index.js"
   },
   "repository": {
     "type": "git",

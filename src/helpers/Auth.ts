@@ -34,7 +34,7 @@ export class Auth {
   private service: AuthService = null;
   private userCodeInfo?: UserCodeInfo;
 
-  constructor(private appId: string) {
+  constructor(private appId: string, private name?: string) {
     this.service = new AuthService();
     this.authCtx = new AuthenticationContext(`${MS_LOGIN_URL}/common`)
   }
@@ -133,7 +133,7 @@ export class Auth {
           }
 
           authMsg.text = response.message;
-          console.log(response.message);
+          console.log(`${this.name}: ${response.message}`);
 
           this.userCodeInfo = response;
           this.authCtx.acquireTokenWithDeviceCode(resource, this.appId as string, response,
