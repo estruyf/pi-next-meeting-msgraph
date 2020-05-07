@@ -47,7 +47,7 @@ let authMsg: AuthLogging = {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature }));
+app.get('/get', (req, res) => res.send({ meeting: nextMeeting, availability, temperature, todoTasks }));
 app.get('/auth', (req, res) => res.send(authMsg));
 app.get('/status', async (req, res) => {
   const status = await getStatus();
