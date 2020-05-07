@@ -4,7 +4,7 @@ import { AccessToken } from '../models';
 const MS_LOGIN_URL = "https://login.microsoftonline.com";
 
 export interface AuthLogging {
-  text: string;
+  [name: string]: string;
 }
 
 export interface Hash<TValue> {
@@ -132,7 +132,7 @@ export class Auth {
             return;
           }
 
-          authMsg.text = response.message;
+          authMsg[this.name] = response.message;
           console.log(`${this.name}: ${response.message}`);
 
           this.userCodeInfo = response;
@@ -149,7 +149,7 @@ export class Auth {
                 return;
               }
 
-              authMsg.text = "Already authenticated";
+              authMsg[this.name] = "Already authenticated";
               this.userCodeInfo = undefined;
               resolve(<TokenResponse>response);
             });

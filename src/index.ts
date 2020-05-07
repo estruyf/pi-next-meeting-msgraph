@@ -40,9 +40,7 @@ let availability = null;
 let todoTasks = null;
 let nextMeeting = { title: "", time: "" };
 let timeoutIdx: NodeJS.Timeout = null;
-let authMsg: AuthLogging = {
-  text: ""
-};
+let authMsg: AuthLogging = {};
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
